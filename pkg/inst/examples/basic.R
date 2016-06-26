@@ -98,6 +98,8 @@ class SimpleExample extends React.Component {
     );
   }
 }
+
+ReactDOM.render(<SimpleExample />, document.body);
 "
 
 browsable(
