@@ -3,8 +3,10 @@
  * table data.
  * @module Utils
  */
+import stable from 'stable';
 import SortDirection from './SortDirection';
 import DataType from './DataType';
+
 
 /**
  * Gets the value of a cell given the row data. If column.value is
@@ -19,11 +21,17 @@ import DataType from './DataType';
  * @param {Object[]} columns The column definitions for the whole table
  * @return {Any} The value for this cell
  */
-export function getCellData(column, rowData, rowNumber, tableData, columns) {
+export function getCellData(column, rowData, rowNumber, tableData, columns, isBottomData) {
   const { value, id } = column;
+
+  // if it is bottom data, just use the value directly.
+  if (isBottomData) {
+    return rowData[id];
+  }
+
   // call value as a function
   if (typeof value === 'function') {
-    return value(rowData, rowNumber, tableData, columns);
+    return value(rowData, { rowNumber, tableData, columns });
 
   // interpret value as a key
   } else if (value != null) {
@@ -90,11 +98,10 @@ export function getColumnById(columns, columnId) {
  * Gets the comparator function to use based on the type of data
  * the column represents. These comparator functions expect the
  * data to be presented as { index, sortValue }. sortValue is used
- * to determine the order and index is used to break ties to maintain
- * a stable sort.
+ * to determine the order.
  *
  * @param {String} type the DataType the column represents
- * @return {Function} the comparator for stable sort
+ * @return {Function} the comparator for sort
  */
 export function getSortComparator(type) {
   let comparator;
@@ -106,8 +113,7 @@ export function getSortComparator(type) {
         const bSortValue = b.sortValue;
 
         if (aSortValue == null && bSortValue == null) {
-          // compare index to maintain stable sort
-          return a.index - b.index;
+          return 0;
         } else if (aSortValue == null) {
           return 1;
         } else if (bSortValue == null) {
@@ -115,11 +121,6 @@ export function getSortComparator(type) {
         }
 
         const difference = parseFloat(aSortValue) - parseFloat(bSortValue);
-
-        if (difference === 0) {
-          // compare index to maintain stable sort
-          return a.index - b.index;
-        }
 
         return difference;
       };
@@ -130,23 +131,17 @@ export function getSortComparator(type) {
         const aSortValue = a.sortValue;
         const bSortValue = b.sortValue;
 
+
         if (aSortValue == null && bSortValue == null) {
-          // compare index to maintain stable sort
-          return a.index - b.index;
+          return 0;
         } else if (aSortValue == null) {
           return -1;
         } else if (bSortValue == null) {
           return 1;
         }
 
-        // compute the result here, then check if equal to maintain stable sort
         const result = String(aSortValue).toLowerCase()
           .localeCompare(String(bSortValue).toLowerCase());
-
-        if (result === 0) {
-          // compare index to maintain stable sort
-          return a.index - b.index;
-        }
 
         return result;
       };
@@ -158,8 +153,7 @@ export function getSortComparator(type) {
         const bSortValue = b.sortValue;
 
         if (aSortValue == null && bSortValue == null) {
-          // compare index to maintain stable sort
-          return a.index - b.index;
+          return 0;
         } else if (aSortValue == null) {
           return -1;
         } else if (bSortValue == null) {
@@ -167,8 +161,7 @@ export function getSortComparator(type) {
         }
 
         if (aSortValue === bSortValue) {
-          // compare index to maintain stable sort
-          return a.index - b.index;
+          return 0;
         }
 
         return aSortValue < bSortValue ? -1 : 1;
@@ -180,8 +173,37 @@ export function getSortComparator(type) {
 }
 
 /**
+ * Helper function to test if an array is already sorted
+ *
+ * @param {Boolean} sortDirection The direction to check if it is sorted in
+ * @param {Array} data The data to check
+ * @param {Function} comparator The comparator to use
+ * @return {Boolean} True if already sorted, false otherwise
+ */
+function alreadySorted(sortDirection, data, comparator) {
+  const numRows = data.length;
+  if (sortDirection === SortDirection.Ascending) {
+    for (let i = 1; i < numRows; i++) {
+      if (comparator(data[i - 1], data[i]) > 0) {
+        return false;
+      }
+    }
+  // check descending
+  } else {
+    for (let i = 1; i < numRows; i++) {
+      if (comparator(data[i - 1], data[i]) < 0) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
  * Sorts the data based on sort value and column type. Uses a stable sort
- * by keeping track of the original position to break ties.
+ * by keeping track of the original position to break ties unless the data
+ * is already sorted, in which case it just reverses the array.
  *
  * @param {Object[]} data the array of data for the whole table
  * @param {String} columnId the column ID of the column to sort by
@@ -203,17 +225,28 @@ export function sortData(data, columnId, sortDirection, columns) {
   // read the type from `sortType` property if defined, otherwise use `type`
   const sortType = column.sortType == null ? column.type : column.sortType;
   const comparator = getSortComparator(sortType);
-  const sortedData = data.map((rowData, index) => ({
+  const dataToSort = data.map((rowData, index) => ({
     rowData,
     index,
     sortValue: getSortValue(column, rowData, index, data, columns),
-  }))
-    .sort(comparator)
-    .map(sortItem => sortItem.rowData);
+  }));
 
-  if (sortDirection === SortDirection.Descending) {
-    sortedData.reverse();
+  // check if already sorted, and if so, just reverse
+  let sortedData;
+
+  // if already sorted in the opposite order, just reverse it
+  if (alreadySorted(!sortDirection, dataToSort, comparator)) {
+    sortedData = dataToSort.reverse();
+
+  // if not sorted, stable sort it
+  } else {
+    sortedData = stable(dataToSort, comparator);
+    if (sortDirection === SortDirection.Descending) {
+      sortedData.reverse();
+    }
   }
+
+  sortedData = sortedData.map(sortItem => sortItem.rowData);
 
   return sortedData;
 }
@@ -232,12 +265,19 @@ export function sortData(data, columnId, sortDirection, columns) {
  * @param {Object[]} columns The column definitions for the whole table
  * @return {Renderable} The contents of the cell
  */
-export function renderCell(cellData, column, rowData, rowNumber, tableData, columns) {
-  const { renderer } = column;
+export function renderCell(cellData, column, rowData, rowNumber, tableData, columns, isBottomData, columnSummary) {
+  const { renderer, renderOnNull } = column;
 
-  // if renderer is provided, call it
-  if (renderer != null) {
-    return renderer(cellData, column, rowData, rowNumber, tableData, columns);
+  // render if not bottom data-- bottomData's cellData is already rendered.
+  if (!isBottomData) {
+    // do not render if value is null and `renderOnNull` is not explicitly set to true
+    if (cellData == null && renderOnNull !== true) {
+      return null;
+
+    // render normally if a renderer is provided
+    } else if (renderer != null) {
+      return renderer(cellData, { column, rowData, rowNumber, tableData, columns, columnSummary });
+    }
   }
 
   // otherwise, render the raw cell data

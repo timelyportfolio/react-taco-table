@@ -1,5 +1,4 @@
 import React from 'react';
-import shallowCompare from 'react-addons-shallow-compare';
 import classNames from 'classnames';
 import TacoTableCell from './TacoTableCell';
 
@@ -10,11 +9,14 @@ const propTypes = {
   className: React.PropTypes.string,
   highlighted: React.PropTypes.bool,
   highlightedColumnId: React.PropTypes.string,
+  isBottomData: React.PropTypes.bool,
+  onClick: React.PropTypes.func,
   onColumnHighlight: React.PropTypes.func,
+  onDoubleClick: React.PropTypes.func,
   onHighlight: React.PropTypes.func,
   plugins: React.PropTypes.array,
   rowData: React.PropTypes.object.isRequired,
-  rowNumber: React.PropTypes.number,
+  rowNumber: React.PropTypes.oneOfType([React.PropTypes.number, React.PropTypes.string]),
   tableData: React.PropTypes.array,
   CellComponent: React.PropTypes.func,
 };
@@ -34,17 +36,20 @@ const defaultProps = {
  * @prop {String} className  The class name for the row
  * @prop {Boolean} highlighted Whether this row is highlighted or not
  * @prop {String} highlightedColumnId   The ID of the highlighted column
+ * @prop {Boolean} isBottomData  Whether this row is in the bottom data area or not
+ * @prop {Function} onClick  callback for when a row is clicked
  * @prop {Function} onColumnHighlight  callback for when a column is highlighted / unhighlighted
+ * @prop {Function} onDoubleClick  callback for when a row is double clicked
  * @prop {Function} onHighlight  callback for when a row is highlighted / unhighlighted
  * @prop {Object[]} plugins  Collection of plugins to run to compute cell style,
  *    cell class name, column summaries
  * @prop {Object} rowData  The data to render in this row
- * @prop {Number} rowNumber  The row number in the table
+ * @prop {Number} rowNumber  The row number in the table (bottom-${i} for bottom data)
  * @prop {Object[]} tableData  The table data
  * @prop {Function} CellComponent  Allow configuration of what component to use to render cells
  * @extends React.Component
  */
-class TacoTableRow extends React.Component {
+class TacoTableRow extends React.PureComponent {
   /**
    * @param {Object} props React props
    */
@@ -53,20 +58,12 @@ class TacoTableRow extends React.Component {
 
     this.handleMouseEnter = this.handleMouseEnter.bind(this);
     this.handleMouseLeave = this.handleMouseLeave.bind(this);
+    this.handleClick = this.handleClick.bind(this);
+    this.handleDoubleClick = this.handleDoubleClick.bind(this);
   }
 
   /**
-   * Uses `shallowCompare`
-   * @param {Object} nextProps The next props
-   * @param {Object} nextState The next state
-   * @return {Boolean}
-   */
-  shouldComponentUpdate(nextProps, nextState) {
-    return shallowCompare(this, nextProps, nextState);
-  }
-
-  /**
-   * Handler for when the mouse enters the `<tr>`. Calls `onHighlight(column.id)`.
+   * Handler for when the mouse enters the `<tr>`. Calls `onHighlight(rowData)`.
    * @private
    */
   handleMouseEnter() {
@@ -75,7 +72,7 @@ class TacoTableRow extends React.Component {
   }
 
   /**
-   * Handler for when the mouse enters the `<tr>`. Calls `onHighlight(column.id)`.
+   * Handler for when the mouse enters the `<tr>`. Calls `onHighlight(null)`.
    * @private
    */
   handleMouseLeave() {
@@ -83,6 +80,23 @@ class TacoTableRow extends React.Component {
     onHighlight(null);
   }
 
+  /**
+   * Handler for when a row is clicked. Calls `onClick(rowData, rowNumber, isBottomData)`.
+   * @private
+   */
+  handleClick() {
+    const { onClick, rowData, rowNumber, isBottomData } = this.props;
+    onClick(rowData, rowNumber, isBottomData);
+  }
+
+  /**
+   * Handler for when a row is double clicked. Calls `onDoubleClick(rowData, rowNumber, isBottomData)`.
+   * @private
+   */
+  handleDoubleClick() {
+    const { onDoubleClick, rowData, rowNumber, isBottomData } = this.props;
+    onDoubleClick(rowData, rowNumber, isBottomData);
+  }
 
   /**
    * Main render method
@@ -90,8 +104,8 @@ class TacoTableRow extends React.Component {
    */
   render() {
     const { className, columnSummaries, columns, rowData, rowNumber, tableData, CellComponent,
-      plugins, onHighlight, onColumnHighlight, highlighted, highlightedColumnId,
-      columnGroups } = this.props;
+      plugins, onHighlight, onClick, onColumnHighlight, onDoubleClick, highlighted,
+      highlightedColumnId, columnGroups, isBottomData } = this.props;
 
     // attach mouse listeners for highlighting
     let onMouseEnter;
@@ -101,11 +115,25 @@ class TacoTableRow extends React.Component {
       onMouseLeave = this.handleMouseLeave;
     }
 
+    // attach click handler
+    let onClickHandler;
+    if (onClick) {
+      onClickHandler = this.handleClick;
+    }
+
+    // attach double click handler
+    let onDoubleClickHandler;
+    if (onDoubleClick) {
+      onDoubleClickHandler = this.handleDoubleClick;
+    }
+
     return (
       <tr
         className={classNames(className, { 'row-highlight': highlighted })}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        onClick={onClickHandler}
+        onDoubleClick={onDoubleClickHandler}
       >
         {columns.map((column, i) => {
           // find the associated column group if configured
@@ -129,6 +157,7 @@ class TacoTableRow extends React.Component {
               onHighlight={onColumnHighlight}
               highlightedColumn={column.id === highlightedColumnId}
               highlightedRow={highlighted}
+              isBottomData={isBottomData}
             />
           );
         })}

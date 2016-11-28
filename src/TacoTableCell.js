@@ -1,5 +1,4 @@
 import React from 'react';
-import shallowCompare from 'react-addons-shallow-compare';
 import classNames from 'classnames';
 import { getCellData, renderCell } from './Utils';
 
@@ -10,10 +9,11 @@ const propTypes = {
   columns: React.PropTypes.array,
   highlightedColumn: React.PropTypes.bool,
   highlightedRow: React.PropTypes.bool,
+  isBottomData: React.PropTypes.bool,
   onHighlight: React.PropTypes.func,
   plugins: React.PropTypes.array,
   rowData: React.PropTypes.object.isRequired,
-  rowNumber: React.PropTypes.number,
+  rowNumber: React.PropTypes.oneOfType([React.PropTypes.number, React.PropTypes.string]),
   tableData: React.PropTypes.array,
 };
 
@@ -31,15 +31,16 @@ const defaultProps = {
  * @prop {Object[]} columns            The column definitions
  * @prop {Boolean} highlightedColumn   Whether this column is highlighted or not
  * @prop {Boolean} highlightedRow      Whether this row is highlighted or not
+ * @prop {Boolean} isBottomData      Whether this row is in the bottom data area or not
  * @prop {Function} onHighlight         callback for when a column is highlighted / unhighlighted
  * @prop {Object[]} plugins            Collection of plugins to run to compute cell style,
  *   cell class name, column summaries
  * @prop {Object} rowData           The data to render in this row
- * @prop {Number} rowNumber         The row number in the table
+ * @prop {Number} rowNumber  The row number in the table (bottom-${i} for bottom data)
  * @prop {Object[]} tableData          The table data
  * @extends React.Component
  */
-class TacoTableCell extends React.Component {
+class TacoTableCell extends React.PureComponent {
   /**
    * @param {Object} props React props
    */
@@ -48,16 +49,6 @@ class TacoTableCell extends React.Component {
 
     this.handleMouseEnter = this.handleMouseEnter.bind(this);
     this.handleMouseLeave = this.handleMouseLeave.bind(this);
-  }
-
-  /**
-   * Uses `shallowCompare`
-   * @param {Object} nextProps The next props
-   * @param {Object} nextState The next state
-   * @return {Boolean}
-   */
-  shouldComponentUpdate(nextProps, nextState) {
-    return shallowCompare(this, nextProps, nextState);
   }
 
   /**
@@ -84,20 +75,18 @@ class TacoTableCell extends React.Component {
    * @private
    */
   computeWithPlugins(property, cellData) {
-    const { column, rowData, rowNumber, tableData, columns,
-      highlightedColumn, highlightedRow, columnSummary, plugins } = this.props;
+    const { column, plugins } = this.props;
 
     let result;
 
     /** evaluates `maybeFunction` as a function if it is one, otherwise returns it as a value */
-    function getValue(maybeFunction) {
+    const getValue = (maybeFunction) => {
       if (typeof maybeFunction === 'function') {
-        return maybeFunction(cellData, columnSummary, column, rowData,
-          highlightedColumn, highlightedRow, rowNumber, tableData, columns);
+        return maybeFunction(cellData, this.props);
       }
 
       return maybeFunction;
-    }
+    };
 
     // interpret plugins
     // run the td class name from each plugin
@@ -162,11 +151,12 @@ class TacoTableCell extends React.Component {
    */
   render() {
     const { column, rowData, rowNumber, tableData, columns,
-      onHighlight, highlightedColumn, columnGroup } = this.props;
+      onHighlight, highlightedColumn, columnGroup, isBottomData, columnSummary } = this.props;
     const { className, type } = column;
 
-    const cellData = getCellData(column, rowData, rowNumber, tableData, columns);
-    const rendered = renderCell(cellData, column, rowData, rowNumber, tableData, columns);
+    const cellData = getCellData(column, rowData, rowNumber, tableData, columns, isBottomData);
+
+    const rendered = renderCell(cellData, column, rowData, rowNumber, tableData, columns, isBottomData, columnSummary);
 
     // attach mouse listeners for highlighting
     let onMouseEnter;

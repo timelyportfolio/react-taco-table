@@ -32,6 +32,15 @@ import exampleHeatmapCode from '!raw!../components/ExampleHeatmap';
 import ExampleHeatmapHighlightOnly from '../components/ExampleHeatmapHighlightOnly';
 import exampleHeatmapHighlightOnlyCode from '!raw!../components/ExampleHeatmapHighlightOnly';
 
+import ExampleBottomData from '../components/ExampleBottomData';
+import exampleBottomDataCode from '!raw!../components/ExampleBottomData';
+
+import ExampleBottomDataMulti from '../components/ExampleBottomDataMulti';
+import exampleBottomDataMultiCode from '!raw!../components/ExampleBottomDataMulti';
+
+import ExampleBottomDataArray from '../components/ExampleBottomDataArray';
+import exampleBottomDataArrayCode from '!raw!../components/ExampleBottomDataArray';
+
 
 import '../site.scss';
 import 'react-taco-table/style/taco-table.scss';
@@ -162,8 +171,8 @@ const examples = [
     component: ExampleHeatmap,
     code: exampleHeatmapCode,
     github: `${githubRoot}/ExampleHeatmap.js`,
-    previewCodeStart: 101,
-    previewCodeLength: 14,
+    previewCodeStart: 114,
+    previewCodeLength: 15,
   },
   {
     id: 'example-heatmap',
@@ -175,6 +184,39 @@ const examples = [
     github: `${githubRoot}/ExampleHeatmapHighlightOnly.js`,
     previewCodeStart: 71,
     previewCodeLength: 18,
+  },
+  {
+    id: 'example-bottom-data',
+    label: 'Add a single row to the bottom of the table',
+    description: `This example shows how to add a single row to the bottom of the table
+      using strings and functions in the column definition.`,
+    component: ExampleBottomData,
+    code: exampleBottomDataCode,
+    github: `${githubRoot}/ExampleBottomData.js`,
+    previewCodeStart: 30,
+    previewCodeLength: 8,
+  },
+  {
+    id: 'example-bottom-data-multi',
+    label: 'Add multiple rows to the bottom of the table',
+    description: `This example shows how to add multiple rows to the bottom of the table
+      using strings and functions in the column definition.`,
+    component: ExampleBottomDataMulti,
+    code: exampleBottomDataMultiCode,
+    github: `${githubRoot}/ExampleBottomDataMulti.js`,
+    previewCodeStart: 31,
+    previewCodeLength: 13,
+  },
+  {
+    id: 'example-bottom-data-array',
+    label: 'Add multiple rows to the bottom of the table with an array of data',
+    description: `This example shows how to add multiple rows to the bottom of the table
+      using an array of data.`,
+    component: ExampleBottomDataArray,
+    code: exampleBottomDataArrayCode,
+    github: `${githubRoot}/ExampleBottomDataArray.js`,
+    previewCodeStart: 49,
+    previewCodeLength: 19,
   },
 ];
 

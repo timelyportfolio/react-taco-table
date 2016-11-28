@@ -14,26 +14,40 @@
  *
  * Plugin options found in `column.plugins.heatmap` since the plugin has id `heatmap`.
  *
- * - **domain** {Number[]} the domain to use for the color scale, if not provided, uses summary min and max
+ * - **domain** {Number[]} the domain to use for the color scale, if not provided, uses columnSummary min and max
  * - **backgroundScale** {Function} the scale to use for the background-color
  * - **colorScale** {Function} the scale to use for the color
  * - **colorShift** {Number} if provided, shifts the background color to create the foreground color.
  *    It is a number between 0 and 1 describing how far to shift.
- * - **colorScheme** {String} if provided, specifies which d3-scale special scale to use. Options
- *    are: Viridis, Inferno, Magma, Plasma, Warm, Cool, Rainbow, CubehelixDefault
+ * - **colorScheme** {String} if provided, specifies which d3-scale/d3-scale-chromatic special
+ *    scale to use. Options are: Viridis, Inferno, Magma, Plasma, Warm, Cool, Rainbow, CubehelixDefault,
+ *    BrBG, PRGn, PiYG, PuOr, RdBu, RdGy, RdYlBu, RdYlGn, Spectral, Blues, Greens, Greys,
+ *    Oranges, Purples, Reds, BuGn, BuPu, GnBu, OrRd, PuBuGn, PuBu, PuRd, RdPu, YlGnBu,
+ *    YlGn, YlOrBr, YlOrRd
+ * - **reverseColors** {Boolean} If true, the colors in the scheme will be applied in reverse order
  *
  * @module plugins/HeatmapPlugin
  */
 import * as Utils from '../Utils';
 import * as Summarizers from '../Summarizers';
 import DataType from '../DataType';
-import * as d3 from 'd3-scale';
+import * as d3Scale from 'd3-scale';
+import * as d3ScaleChromatic from 'd3-scale-chromatic';
+
+// combine the modules into one big d3 module
+const d3 = Object.assign({}, d3Scale, d3ScaleChromatic);
 
 /**
- * Special color schemes available via d3-scale `interpolate${scheme}(t)` functions.
+ * Special color schemes available via d3-scale and d3-scale-chromatic
+ * `interpolate${scheme}(t)` functions.
+ *
+ * See https://github.com/d3/d3-scale-chromatic
+ * and https://github.com/d3/d3-scale#interpolateViridis
+ *
  * @enum {String}
  */
 const ColorSchemes = {
+  // from d3-scale
   Viridis: 'Viridis',
   Inferno: 'Inferno',
   Magma: 'Magma',
@@ -42,27 +56,59 @@ const ColorSchemes = {
   Cool: 'Cool',
   Rainbow: 'Rainbow',
   CubehelixDefault: 'CubehelixDefault',
+
+  // from d3-scale-chromatic
+  BrBG: 'BrBG',
+  PRGn: 'PRGn',
+  PiYG: 'PiYG',
+  PuOr: 'PuOr',
+  RdBu: 'RdBu',
+  RdGy: 'RdGy',
+  RdYlBu: 'RdYlBu',
+  RdYlGn: 'RdYlGn',
+  Spectral: 'Spectral',
+  Blues: 'Blues',
+  Greens: 'Greens',
+  Greys: 'Greys',
+  Oranges: 'Oranges',
+  Purples: 'Purples',
+  Reds: 'Reds',
+  BuGn: 'BuGn',
+  BuPu: 'BuPu',
+  GnBu: 'GnBu',
+  OrRd: 'OrRd',
+  PuBuGn: 'PuBuGn',
+  PuBu: 'PuBu',
+  PuRd: 'PuRd',
+  RdPu: 'RdPu',
+  YlGnBu: 'YlGnBu',
+  YlGn: 'YlGn',
+  YlOrBr: 'YlOrBr',
+  YlOrRd: 'YlOrRd',
 };
+
+const defaultColorScheme = ColorSchemes.Blues;
 
 /**
  * Compute the style for the td elements by setting the background and color
  * based on the sort value.
  *
  * @param {Object} cellData the data for the cell
- * @param {Object} summary the column summary
- * @param {Object} column The column definition
- * @param {Object} rowData the data for the row
+ * @param {Object} props Additional properties for the cell
+ * @param {Object} props.columnSummary the column summary
+ * @param {Object} props.column The column definition
+ * @param {Object} props.rowData the data for the row
+ * @param {Boolean} props.isBottomData whether the row is in bottom data area
  * @return {Object} the style object
  */
-function tdStyle(cellData, summary, column, rowData) {
+function tdStyle(cellData, { columnSummary, column, rowData, isBottomData }) {
   let domain;
   let backgroundScale;
   let colorScale;
   let colorShift;
   let colorScheme;
-
-  // compute the sort value
-  const sortValue = Utils.getSortValueFromCellData(cellData, column, rowData);
+  let reverseColors;
+  let includeBottomData;
 
   // read in from plugin options
   if (column.plugins && column.plugins.heatmap) {
@@ -71,11 +117,35 @@ function tdStyle(cellData, summary, column, rowData) {
     colorScale = column.plugins.heatmap.colorScale;
     colorShift = column.plugins.heatmap.colorShift;
     colorScheme = column.plugins.heatmap.colorScheme;
+    reverseColors = column.plugins.heatmap.reverseColors;
+    includeBottomData = column.plugins.heatmap.includeBottomData;
   }
 
-  // default domain if not provided comes from summary
+
+  // skip in bottom data area unless this column explicitly says to include it
+  if (isBottomData && !includeBottomData) {
+    return undefined;
+  }
+
+  // compute the sort value
+  const sortValue = Utils.getSortValueFromCellData(cellData, column, rowData);
+
+  // do not heatmap null or undefined values
+  if (sortValue == null) {
+    return undefined;
+  }
+
+  // default domain if not provided comes from columnSummary
   if (!domain) {
-    domain = [summary.min, summary.max];
+    // if we didn't get a min/max, just use [0, 1]
+    const colMin = columnSummary.min == null ? 0 : columnSummary.min;
+    const colMax = columnSummary.max == null ? 1 : columnSummary.max;
+    domain = [colMin, colMax];
+  }
+
+  // reverse the domain if specified to get the color scheme inverted
+  if (reverseColors) {
+    domain = domain.slice().reverse();
   }
 
   const domainScale = d3.scaleLinear().domain(domain)
@@ -108,7 +178,7 @@ function tdStyle(cellData, summary, column, rowData) {
 
   // if no background scale and color scale provided, use default - magma
   if (backgroundScale == null) {
-    colorScheme = colorScheme || ColorSchemes.Magma;
+    colorScheme = colorScheme || defaultColorScheme;
 
     backgroundColor = d3[`interpolate${colorScheme}`](domainScale(sortValue));
     if (!colorScale) {

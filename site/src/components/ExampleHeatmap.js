@@ -40,6 +40,18 @@ const columns = [
     type: DataType.Number,
     renderer: Formatters.plusMinusFormat(1),
   },
+  // this column reverses the color scheme
+  {
+    id: 'value-reverse',
+    type: DataType.Number,
+    value: rowData => rowData.value,
+    renderer: Formatters.plusMinusFormat(1),
+    plugins: {
+      heatmap: {
+        reverseColors: true,
+      },
+    },
+  },
   {
     id: 'value-inferno',
     type: DataType.Number,
@@ -59,7 +71,7 @@ const columns = [
     renderer: Formatters.plusMinusFormat(2),
     plugins: {
       heatmap: {
-        colorScheme: Plugins.HeatmapPlugin.ColorSchemes.Rainbow,
+        colorScheme: Plugins.HeatmapPlugin.ColorSchemes.YlOrRd,
         // specify an color scale -> always black
         colorScale: () => '#000',
       },
@@ -109,6 +121,7 @@ class ExampleHeatmap extends React.Component {
         columns={columns}
         data={cellLinesData}
         plugins={plugins}
+        initialSortColumnId="value"
         sortable
       />
     );
