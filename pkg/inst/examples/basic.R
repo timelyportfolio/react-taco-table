@@ -81,15 +81,15 @@ jscode <- "
       renderer: TacoTable.Formatters.decFormat(1),
       firstSortDirection: TacoTable.SortDirection.Descending,
       summarize: TacoTable.Summarizers.minMaxSummarizer,
-    tdStyle(cellData, { columnSummary }) {
-      if (cellData === columnSummary.min) {
-        return { color: 'red' };
-      } else if (cellData === columnSummary.max) {
-        return { color: 'green' };
-      }
-      
-      return undefined;
-    },
+      tdStyle(cellData, { columnSummary }) {
+        if (cellData === columnSummary.min) {
+          return { color: 'red' };
+        } else if (cellData === columnSummary.max) {
+          return { color: 'green' };
+        }
+        
+        return undefined;
+      },
       tdClassName: TacoTable.TdClassNames.minMaxClassName,
     },
     ];
